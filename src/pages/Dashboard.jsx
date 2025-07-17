@@ -1,8 +1,6 @@
+
 // rrd imports
 import { Link, useLoaderData } from "react-router-dom";
-
-// library imports
-import { toast } from "react-toastify";
 
 // components
 import Intro from "../components/Intro";
@@ -10,8 +8,9 @@ import AddBudgetForm from "../components/AddBudgetForm";
 import AddExpenseForm from "../components/AddExpenseForm";
 import BudgetItem from "../components/BudgetItem";
 import Table from "../components/Table";
-
-//  helper functions
+import BudgetPieChart from "../components/BudgetPieChart";
+import BudgetCard from "../components/BudgetCard";
+// helper functions
 import {
   createBudget,
   createExpense,
@@ -25,61 +24,52 @@ export function dashboardLoader() {
   const userName = fetchData("userName");
   const budgets = fetchData("budgets");
   const expenses = fetchData("expenses");
-  return { userName, budgets, expenses };
+
+  const budgetsWithExpenses = budgets?.map((budget) => ({
+    ...budget,
+    expenses: expenses?.filter((expense) => expense.budgetId === budget.id),
+  })) || [];
+
+  return { userName, budgets: budgetsWithExpenses, expenses };
 }
 
-// action
+// action (must return at least null)
 export async function dashboardAction({ request }) {
+  const formData = await request.formData();
+  const { _action, ...values } = Object.fromEntries(formData);
+
   await waait();
 
-  const data = await request.formData();
-  const { _action, ...values } = Object.fromEntries(data);
-
-  // new user submission
-  if (_action === "newUser") {
-    try {
+  try {
+    if (_action === "newUser") {
       localStorage.setItem("userName", JSON.stringify(values.userName));
-      return toast.success(`Welcome, ${values.userName}`);
-    } catch (e) {
-      throw new Error("There was a problem creating your account.");
+      return null;
     }
-  }
 
-  if (_action === "createBudget") {
-    try {
+    if (_action === "createBudget") {
       createBudget({
         name: values.newBudget,
         amount: values.newBudgetAmount,
       });
-      return toast.success("Budget created!");
-    } catch (e) {
-      throw new Error("There was a problem creating your budget.");
+      return null;
     }
-  }
 
-  if (_action === "createExpense") {
-    try {
+    if (_action === "createExpense") {
       createExpense({
         name: values.newExpense,
         amount: values.newExpenseAmount,
         budgetId: values.newExpenseBudget,
       });
-      return toast.success(`Expense ${values.newExpense} created!`);
-    } catch (e) {
-      throw new Error("There was a problem creating your expense.");
+      return null;
     }
-  }
 
-  if (_action === "deleteExpense") {
-    try {
-      deleteItem({
-        key: "expenses",
-        id: values.expenseId,
-      });
-      return toast.success("Expense deleted!");
-    } catch (e) {
-      throw new Error("There was a problem deleting your expense.");
+    if (_action === "deleteExpense") {
+      deleteItem({ key: "expenses", id: values.expenseId });
+      return null;
     }
+
+  } catch (e) {
+    throw new Error("There was a problem processing your request");
   }
 }
 
@@ -100,12 +90,20 @@ const Dashboard = () => {
                   <AddBudgetForm />
                   <AddExpenseForm budgets={budgets} />
                 </div>
+
+                {/* Budget Chart */}
+                <div className="chart-section">
+                  <h2>Budget Overview</h2>
+                  <BudgetPieChart budgets={budgets} />
+                </div>
+
                 <h2>Existing Budgets</h2>
                 <div className="budgets">
                   {budgets.map((budget) => (
                     <BudgetItem key={budget.id} budget={budget} />
                   ))}
                 </div>
+
                 {expenses && expenses.length > 0 && (
                   <div className="grid-md">
                     <h2>Recent Expenses</h2>
@@ -137,4 +135,5 @@ const Dashboard = () => {
     </>
   );
 };
+
 export default Dashboard;
